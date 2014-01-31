@@ -1,5 +1,5 @@
 ''' 
-This procedure compares spectra to NIR L standards or Templates, using the database!
+This procedure compares spectra to NIR L templates, either Alejandro's txt files or Adam's fits files.
 '''
 
 def separate_bands(spec, bandnames, bandlimits):
@@ -28,100 +28,6 @@ def separate_bands(spec, bandnames, bandlimits):
         specSep[bIdx] = spec[:,idx]
         
     return specSep
-
-def get_spec(unum, separate=False, bandnames=None, bandlimits=None, retCoord=False, retST=False):
-    '''
-    This function finds and pulls spectrum from the BDNYC database. Specifically, it looks for low-res, NIR SpeX Prism spectra. It can split and normalize it by the NIR bands (J, H, and K).
-    
-    *unum*
-      String with the U-number of the target (e.g. U20268).
-    *separate*
-      Boolean, whether to split the spectrum by NIR bands (J, H, and K)
-    *bandnames*
-      List with the names of the bands, in the order desired.
-    *bandlimits*
-      Dictionary with bandnames keys containing a list with float numbers specifying the bands limits (e.g. {'J': [0.8,1.4], 'H': [1.4,1.9], 'K': [1.9,2.4]}
-    *retCoord*
-      Boolean, whether to pull from the database the target coordinates
-    *retST*
-      Boolean, whether to pull from the database the target spectral type
-    '''
-    
-    import pickle
-    import BDNYC
-    import astrotools as at
-    
-    # 1. Initialize variables ---------------------------------------
-    FOLDER_DB = '/Users/kelle/Code/Python/BDNYC/BDdatabase/'
-    FILE_DB = 'BDNYCData.txt'
-    
-    # 2. Load database ----------------------------------------------
-    f = open(FOLDER_DB + FILE_DB,'rb')
-    bdnyc = pickle.load(f)
-    f.close()
-    
-    # 3. Check data available for target ----------------------------
-    availData = bdnyc.show_data(unum, dump=True)
-    if availData is None:
-        return None, None
-    
-    # 4. Find Spex Prism data ---------------------------------------
-    spexFound = False
-    for row in availData:
-        # Check that row is data row
-        try:
-            row[0] + 1
-        except TypeError:
-            continue
-        # Check that row is nir row
-        try:
-            loc = row.index('nir')
-        except ValueError:
-            continue
-        # Check that row is low res row
-        try:
-            loc = row.index('low')
-        except ValueError:
-            continue
-        # Check that row is Spex Prism row
-        instr = row[3].lower()
-        loc = instr.find('spex')
-        if loc != -1:
-            spexFound = True
-            specIdx = row[0]
-            break
-    if not spexFound:
-        print 'Spectrum for target not found.'
-        return None, None
-    
-    # 5. Fetch target parameters if requested -----------------------
-    params = []
-    if retCoord:
-        ra = availData[4][1][0:5]
-        dec = availData[5][1][0:6]
-        coord = ra + dec
-        coord = coord.replace(' ','')
-        params.append(coord)
-    if retST:
-        st = availData[3][1]
-        params.append(st)
-    
-    # 6. Get spectrum -----------------------------------------------
-    specRaw = bdnyc.get_data(unum, specIdx)
-    
-    # 7. Separate spectrum by bands ---------------------------------
-    if separate:
-        specSep = separate_bands(specRaw, bandnames, bandlimits)
-        
-        if params != []:
-            return specSep, params
-        else:
-            return specSep
-    else:
-        if params != []:
-                return specRaw, params
-        else:
-            return specRaw
 
 
 def plotspec(specData, bandNames, limits, objID, plotInstructions, plotInput=None):
@@ -175,6 +81,7 @@ def plotspec(specData, bandNames, limits, objID, plotInstructions, plotInput=Non
     colors[4]  = COLOR_SET[[1,11,20,29]].tolist()
     colors[3]  = COLOR_SET[[1,20,29]].tolist()
     colors[2]  = COLOR_SET[[1,29]].tolist()
+    colors[1]  = COLOR_SET[[1]].tolist()
     
     numColors = len(specData['J']) / 2
     plotColors = colors[numColors][:]
@@ -397,45 +304,49 @@ def plotspec(specData, bandNames, limits, objID, plotInstructions, plotInput=Non
 # 1. LOAD RELEVANT MODULES ----------------------------------------------------
 import numpy as np
 import matplotlib.pyplot as plt
-#import asciidata as ad
-from astropy.io import ascii
 import astrotools as at
 import sys
 import pdb
 
 # 2. SET UP VARIABLES ---------------------------------------------------------
+GITUSER = 'alejo'
+
 # Paths
-# FOLDER_OUT = '/Users/alejo/KCData/Output/compare/'
-# FOLDER_TEMPL = '/Users/alejo/KCData/Output/templates/'
-
-FOLDER_OUT = '/Users/kelle/Dropbox/Analysis/compare/'
-FOLDER_TEMPL = '/Users/kelle/Dropbox/Shared/Kelle-Alejo/templates/'
-
+if GITUSER == 'alejo':
+    FOLDER_OUT = '/Users/alejo/KCData/Output/compare/'
+    FOLDER_TEMPL = '/Users/alejo/KCData/Output/compare/templates/'
+    import asciidata as ad
+elif GITUSER == 'kelle':
+    FOLDER_OUT = '/Users/kelle/Dropbox/Analysis/compare/'
+    FOLDER_TEMPL = '/Users/kelle/Dropbox/Shared/Kelle-Alejo/templates/'
+    from astropy.io import ascii
 
 DELL_CHAR = '\t' # Delimiter character
 
 # Get user input
-interestObject = raw_input('enter U-number (e.g. U10000) or FITS file name with full path: ').strip()
+interestObject = raw_input('enter FITS file name with full path: ').strip()
 ObjectName = raw_input('Objects Name: ').strip()
-grav = raw_input('enter g/b/f to select templates: ').lower()
+grav = 'f' # raw_input('enter g/b/f to select templates: ').lower()
+inputAdam = raw_input('Use Adam`s templates? (y/n; blank=no): ').strip().lower()
 if interestObject == '' or grav == '':
     sys.exit(0)
-if len(interestObject) != 6:
-    try:
-        with open(interestObject): pass
-    except IOError:
-        print 'File not found.'
-        sys.exit(0)
-    unum = None
+try:
+    with open(interestObject): pass
+except IOError:
+    print 'File not found.'
+    sys.exit(0)
+if inputAdam == '' or inputAdam == 'n':
+    AdamTemplates = False
 else:
-    unum = interestObject.upper()
+    AdamTemplates = True
 
 if grav == 'g':
     SP_TYPES = ['L0','L2','L3','L4']
 elif grav =='b':
-        SP_TYPES = ['L0','L1']
+    SP_TYPES = ['L0','L1']
 else:
-    SP_TYPES = ['L0','L1','L2','L3','L4','L5','L6','L7','L8']
+    SP_TYPES = ['L0']
+    #SP_TYPES = ['L0','L1','L2','L3','L4','L5','L6','L7','L8']
 
 # Define spectral bands
 BANDS = ['J','H','K']
@@ -458,23 +369,13 @@ BAND_NORMS['K'][0] = 1.91
 BAND_NORMS['K'][1] = 2.39
 
 # 3. GET SPECTRUM OF TARGET ---------------------------------------------------
-    #if unum is not None:
-    # Get spectrum from database
-    #    specSep, parameters = get_spec(unum, separate=True, bandnames=BANDS, bandlimits=BAND_LIMS, \
-    #                               retCoord=True, retST=True)#
-    #      if specSep is None:
-    #       'Could not get spectrum from database.'
-    #      sys.exit(0)
-#else:
-    # Get spectrum from FITS file
 specRaw = at.read_spec(interestObject)[0]
 specRaw = np.array(specRaw)
-    
 if specRaw is None:
     print 'Could not get spectrum from file.'
     sys.exit(0)
 
-    # Separate spectrum by bands
+# Separate spectrum by bands
 specSep = separate_bands(specRaw, BANDS, BAND_LIMS)
 
 # Normalize spectrum
@@ -486,12 +387,7 @@ if specN[0] is None:
     'Error normalizing spectra.'
     sys.exit(0)
 
-# 4. GET SPECTRAL NIR TEMPLATES -----------------------------------------------
-#if grav == 'g':
-#    UNIQUE = [None,'U10381',None,None,None,None,None,None,None,None]
-#elif grav == 'b':
-#    UNIQUE = [None,None,'U20037','U40039',None,None,None,None,None,None]
-
+# 4. GET NIR TEMPLATES --------------------------------------------------------
 # 4.1 Initialize holder of template spectra and strips
 templ = [None] * len(SP_TYPES)
 for tp in range(len(SP_TYPES)):
@@ -499,25 +395,27 @@ for tp in range(len(SP_TYPES)):
 
 # 4.2 Fetch templates
 for spIdx, sp in enumerate(SP_TYPES):
-    # Get spectra of unique objects for types with only one member
- #   if grav != 'f' and UNIQUE[spIdx] is not None:
-  #      unique_unum = UNIQUE[spIdx]
-   #     templ[spIdx] = get_spec(unique_unum, separate=True, bandnames=BANDS, bandlimits=BAND_LIMS)
-        #templ[spIdx] = at.norm_spec(templ[spIdx], BAND_NORMS[band])[0]
-    # For all others, read the template ascii files
-    #else:
     for bdIdx, band in enumerate(BANDS):
-        fileNm = sp + band + '_' + grav + '.txt'
-        #try:
-        #templRaw = ad.open(FOLDER_TEMPL + fileNm, delimiter=DELL_CHAR)
-        templRaw = ascii.read(FOLDER_TEMPL + fileNm, format='no_header', delimiter=DELL_CHAR)
-        #except IOError:
-        #    continue
-        #templLs = np.array(templRaw).tolist()
-        templLs = np.array([templRaw[c].data.tolist() for c in templRaw.colnames])
+        if AdamTemplates:
+            fileNm = sp + '_template_'+ band + '.fits'
+            templRaw = at.read_spec(FOLDER_TEMPL + fileNm, templ=True, verbose=False)[0]
+            templLs = np.array(templRaw) #.tolist()
+            # Normalize spectrum
+            minIdx = np.where(templLs[0,:] > BAND_NORMS[band][0])[0][0]
+            maxIdx = np.where(templLs[0] < BAND_NORMS[band][1])[0][-1]
+            templLs[1:,:] = templLs[1:,:] / np.mean(templLs[1][minIdx:maxIdx])
+            templLs = templLs.tolist()
+        else:
+            fileNm = sp + band + '_' + grav + '.txt'
+            if GITUSER == 'alejo':
+                templRaw = ad.open(FOLDER_TEMPL + fileNm, delimiter=DELL_CHAR)
+                templLs = np.array(templRaw).tolist()
+            elif GITUSER == 'kelle':
+                templRaw = ascii.read(FOLDER_TEMPL + fileNm, format='no_header', delimiter=DELL_CHAR)
+                templLs = np.array([templRaw[c].data.tolist() for c in templRaw.colnames])
         templRaw = ''
         templ[spIdx][bdIdx] = templLs
-            
+
 # 5. CONSOLIDATE ALL SPECTRA --------------------------------------------------
 # 5.1 Initialize holders of consolidated spectra and headers
 spTypes = []
@@ -552,17 +450,13 @@ else:
 for sTidx, sT in enumerate(spTypes):
     spTypes[sTidx] = spTypes[sTidx] + greek
 
-if unum is not None:
-    tgtName = unum + ' ' + parameters[0] + ' ' + parameters[1]
-else:
-    tgtName = ObjectName
 figure = plotspec(specData=spectra, bandNames=BANDS, limits=BAND_LIMS, \
                   objID=spTypes, plotInstructions=plotInstructions, \
-                  plotInput=tgtName+' '+interestObject)
+                  plotInput=ObjectName + ' ' + interestObject)
 
-if unum is not None:
-    plt.savefig(FOLDER_OUT + unum + '_' + grav + '_' + parameters[1] + '.pdf', dpi=600)
-    print 'wrote: '+ FOLDER_OUT + unum + '_' + grav + '_' + parameters[1] + '.pdf'
+if AdamTemplates:
+    txtadam = '_adam'
 else:
-    plt.savefig(FOLDER_OUT + ObjectName +'_' + grav + '.pdf', dpi=600)
-    print 'wrote: ' + FOLDER_OUT + ObjectName +'_' + grav + '.pdf'
+    txtadam = ''
+plt.savefig(FOLDER_OUT + ObjectName +'_' + grav + txtadam + '.pdf', dpi=600)
+print 'wrote: ' + FOLDER_OUT + ObjectName +'_' + grav + txtadam + '.pdf'
