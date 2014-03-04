@@ -305,6 +305,7 @@ def plotspec(specData, bandNames, limits, objID, plotInstructions, plotInput=Non
 import numpy as np
 import matplotlib.pyplot as plt
 import astrotools as at
+from astropy.io import ascii
 import sys
 import pdb
 
@@ -315,11 +316,9 @@ GITUSER = 'alejo'
 if GITUSER == 'alejo':
     FOLDER_OUT = '/Users/alejo/KCData/Output/compare/'
     FOLDER_TEMPL = '/Users/alejo/KCData/Output/compare/templates/'
-    import asciidata as ad
 elif GITUSER == 'kelle':
     FOLDER_OUT = '/Users/kelle/Dropbox/Analysis/compare/'
     FOLDER_TEMPL = '/Users/kelle/Dropbox/Shared/Kelle-Alejo/templates/'
-    from astropy.io import ascii
 
 DELL_CHAR = '\t' # Delimiter character
 
@@ -345,8 +344,8 @@ if grav == 'g':
 elif grav =='b':
     SP_TYPES = ['L0','L1']
 else:
-    SP_TYPES = ['L0']
-    #SP_TYPES = ['L0','L1','L2','L3','L4','L5','L6','L7','L8']
+    #SP_TYPES = ['L0']
+    SP_TYPES = ['L0','L1','L2','L3','L4','L5','L6','L7','L8']
 
 # Define spectral bands
 BANDS = ['J','H','K']
@@ -407,12 +406,12 @@ for spIdx, sp in enumerate(SP_TYPES):
             templLs = templLs.tolist()
         else:
             fileNm = sp + band + '_' + grav + '.txt'
-            if GITUSER == 'alejo':
-                templRaw = ad.open(FOLDER_TEMPL + fileNm, delimiter=DELL_CHAR)
-                templLs = np.array(templRaw).tolist()
-            elif GITUSER == 'kelle':
-                templRaw = ascii.read(FOLDER_TEMPL + fileNm, format='no_header', delimiter=DELL_CHAR)
-                templLs = np.array([templRaw[c].data.tolist() for c in templRaw.colnames])
+            #if GITUSER == 'alejo':
+            #    templRaw = ad.open(FOLDER_TEMPL + fileNm, delimiter=DELL_CHAR)
+            #    templLs = np.array(templRaw).tolist()
+            #elif GITUSER == 'kelle':
+            templRaw = ascii.read(FOLDER_TEMPL + fileNm, format='no_header', delimiter=DELL_CHAR)
+            templLs = np.array([templRaw[c].data.tolist() for c in templRaw.colnames])
         templRaw = ''
         templ[spIdx][bdIdx] = templLs
 
